@@ -26,13 +26,13 @@ class TrainMain:
         self.train_loader = get_train_loader(self.conf)
 
     def train_model(self):
-        self._init_model_param()
+        self._init_model_param() # 初始化模型参数
         self._train_stage()
 
     def _init_model_param(self):
-        self.cls_criterion = CrossEntropyLoss()
-        self.ft_criterion = MSELoss()
-        self.model = self._define_network()
+        self.cls_criterion = CrossEntropyLoss() # 交叉熵损失
+        self.ft_criterion = MSELoss() # 用来衡量傅里叶损失
+        self.model = self._define_network() # 定义了模型
         self.optimizer = optim.SGD(self.model.module.parameters(),
                                    lr=self.conf.lr,
                                    weight_decay=5e-4,
@@ -41,12 +41,14 @@ class TrainMain:
         self.schedule_lr = optim.lr_scheduler.MultiStepLR(
             self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
 
+        # 输出学习率，epoch和学习率变化的时段
         print("lr: ", self.conf.lr)
         print("epochs: ", self.conf.epochs)
         print("milestones: ", self.conf.milestones)
 
     def _train_stage(self):
         self.model.train()
+        #初始化loss
         running_loss = 0.
         running_acc = 0.
         running_loss_cls = 0.
@@ -57,13 +59,14 @@ class TrainMain:
                 self.writer = SummaryWriter(self.conf.log_path)
                 is_first = False
             print('epoch {} started'.format(e))
-            print("lr: ", self.schedule_lr.get_lr())
+            print("lr: ", self.schedule_lr.get_lr()) #更新学习率，并输出
 
             for sample, ft_sample, target in tqdm(iter(self.train_loader)):
                 imgs = [sample, ft_sample]
                 labels = target
 
-                loss, acc, loss_cls, loss_ft = self._train_batch_data(imgs, labels)
+                loss, acc, loss_cls, loss_ft = self._train_batch_data(imgs, labels) #获取总loss，分类loss以及傅里叶loss
+                # loss值的更新
                 running_loss_cls += loss_cls
                 running_loss_ft += loss_ft
                 running_loss += loss
@@ -71,34 +74,34 @@ class TrainMain:
 
                 self.step += 1
 
-                if self.step % self.board_loss_every == 0 and self.step != 0:
+                if self.step % self.board_loss_every == 0 and self.step != 0: # 每过tensorboard的更新周期进行各曲线的更新
                     loss_board = running_loss / self.board_loss_every
                     self.writer.add_scalar(
-                        'Training/Loss', loss_board, self.step)
+                        'Training/Loss', loss_board, self.step) # 绘制loss曲线
                     acc_board = running_acc / self.board_loss_every
                     self.writer.add_scalar(
-                        'Training/Acc', acc_board, self.step)
+                        'Training/Acc', acc_board, self.step) # 绘制准确率acc曲线
                     lr = self.optimizer.param_groups[0]['lr']
                     self.writer.add_scalar(
-                        'Training/Learning_rate', lr, self.step)
+                        'Training/Learning_rate', lr, self.step) # 绘制学习率lr曲线
                     loss_cls_board = running_loss_cls / self.board_loss_every
                     self.writer.add_scalar(
-                        'Training/Loss_cls', loss_cls_board, self.step)
+                        'Training/Loss_cls', loss_cls_board, self.step) # 绘制分类loss曲线
                     loss_ft_board = running_loss_ft / self.board_loss_every
                     self.writer.add_scalar(
-                        'Training/Loss_ft', loss_ft_board, self.step)
+                        'Training/Loss_ft', loss_ft_board, self.step) # 绘制傅里叶辅助loss曲线
 
                     running_loss = 0.
                     running_acc = 0.
                     running_loss_cls = 0.
                     running_loss_ft = 0.
-                if self.step % self.save_every == 0 and self.step != 0:
+                if self.step % self.save_every == 0 and self.step != 0: # 每过保存周期对训练模型进行保存
                     time_stamp = get_time()
                     self._save_state(time_stamp, extra=self.conf.job_name)
             self.schedule_lr.step()
 
         time_stamp = get_time()
-        self._save_state(time_stamp, extra=self.conf.job_name)
+        self._save_state(time_stamp, extra=self.conf.job_name) 
         self.writer.close()
 
     def _train_batch_data(self, imgs, labels):
@@ -106,10 +109,10 @@ class TrainMain:
         labels = labels.to(self.conf.device)
         embeddings, feature_map = self.model.forward(imgs[0].to(self.conf.device))
 
-        loss_cls = self.cls_criterion(embeddings, labels)
-        loss_fea = self.ft_criterion(feature_map, imgs[1].to(self.conf.device))
+        loss_cls = self.cls_criterion(embeddings, labels) # 分类损失
+        loss_fea = self.ft_criterion(feature_map, imgs[1].to(self.conf.device)) # 傅里叶损失
 
-        loss = 0.5*loss_cls + 0.5*loss_fea
+        loss = 0.5*loss_cls + 0.5*loss_fea # 总损失
         acc = self._get_accuracy(embeddings, labels)[0]
         loss.backward()
         self.optimizer.step()

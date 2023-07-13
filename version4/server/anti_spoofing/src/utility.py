@@ -13,12 +13,12 @@ def get_time():
     return (str(datetime.now())[:-10]).replace(' ', '-').replace(':', '-')
 
 
-def get_kernel(height, width):
+def get_kernel(height, width): # 用于傅里叶分解的核的大小
     kernel_size = ((height + 15) // 16, (width + 15) // 16)
     return kernel_size
 
 
-def get_width_height(patch_info):
+def get_width_height(patch_info): # 分割patch_info，提取宽度和高度信息
     w_input = int(patch_info.split('x')[-1])
     h_input = int(patch_info.split('x')[0].split('_')[-1])
     return w_input,h_input
